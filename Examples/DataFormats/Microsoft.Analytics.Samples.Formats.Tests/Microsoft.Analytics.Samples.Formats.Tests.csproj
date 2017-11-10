@@ -66,10 +66,17 @@
     </Otherwise>
   </Choose>
   <ItemGroup>
+    <Compile Include="AvroExtractorFileTest.cs.cs" />
     <Compile Include="AvroExtractorTest.cs" />
     <Compile Include="AvroOutputterTest.cs" />
+    <Compile Include="Mocks\ColumnMock.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Mocks\RowMock.cs" />
+    <Compile Include="Mocks\SchemaMock.cs" />
     <Compile Include="SingleColumnPoco.cs" />
+    <Compile Include="UnstructuredReaderAvroWrapperTest.cs" />
+    <Compile Include="Mocks\UpdatableRowMock.cs" />
+    <Compile Include="Mocks\UnstructuredReaderMock.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Microsoft.Analytics.Samples.Formats\Microsoft.Analytics.Samples.Formats.csproj">

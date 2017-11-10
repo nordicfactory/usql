@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+
 using System.Collections.Generic;
 using Microsoft.Analytics.Interfaces;
 using Avro.File;
@@ -24,36 +25,32 @@ namespace Microsoft.Analytics.Samples.Formats.ApacheAvro
     [SqlUserDefinedExtractor(AtomicFileProcessing = true)]
     public class AvroExtractor : IExtractor
     {
-        private string avroSchema;
-        private bool mapToInternalSchema;
+        private readonly string _avroSchema;
+        private readonly bool _mapToInternalSchema;
 
         public AvroExtractor(string avroSchema, bool mapToInternalSchema = false)
         {
-            this.avroSchema = avroSchema;
-            this.mapToInternalSchema = mapToInternalSchema;
+            _avroSchema = avroSchema;
+            _mapToInternalSchema = mapToInternalSchema;
         }
 
         public override IEnumerable<IRow> Extract(IUnstructuredReader input, IUpdatableRow output)
         {
             Avro.Schema avschema = null;
 
-            if (!string.IsNullOrWhiteSpace(avroSchema))
+            if (!string.IsNullOrWhiteSpace(_avroSchema))
             {
-                avschema = Avro.Schema.Parse(avroSchema);
+                avschema = Avro.Schema.Parse(_avroSchema);
             }
-            
-            IFileReader<GenericRecord> fileReader = null;
 
-            using (var ms = new MemoryStream())
+            IFileReader<GenericRecord> fileReader = null;
+            using (var stream = new UnstructuredReaderAvroWrapper(input))
             {
-                CreateSeekableStream(input, ms);
-                ms.Position = 0;
-                
                 var foundSchema = false;
 
-                if (mapToInternalSchema)
+                if (_mapToInternalSchema)
                 {
-                    fileReader = DataFileReader<GenericRecord>.OpenReader(ms);
+                    fileReader = DataFileReader<GenericRecord>.OpenReader(stream);
                     var schema = fileReader.GetSchema();
 
                     foundSchema = schema != null;
@@ -61,8 +58,8 @@ namespace Microsoft.Analytics.Samples.Formats.ApacheAvro
 
                 if (!foundSchema)
                 {
-                    ms.Position = 0;
-                    fileReader = DataFileReader<GenericRecord>.OpenReader(ms, avschema);
+                    stream.Position = 0;
+                    fileReader = DataFileReader<GenericRecord>.OpenReader(stream, avschema);
                 }
 
                 while (fileReader?.HasNext() == true)
@@ -84,11 +81,48 @@ namespace Microsoft.Analytics.Samples.Formats.ApacheAvro
                     yield return output.AsReadOnly();
                 }
             }
-        }
+           
+            //using (var ms = new MemoryStream())
+            //{
+            //    CreateSeekableStream(input, ms);
+            //    ms.Position = 0;
 
-        private void CreateSeekableStream(IUnstructuredReader input, MemoryStream output)
-        {
-            input.BaseStream.CopyTo(output);
+            //    var foundSchema = false;
+
+            //    if (mapToInternalSchema)
+            //    {
+            //        fileReader = DataFileReader<GenericRecord>.OpenReader(ms);
+            //        var schema = fileReader.GetSchema();
+
+            //        foundSchema = schema != null;
+            //    }
+
+            //    if (!foundSchema)
+            //    {
+            //        ms.Position = 0;
+            //        fileReader = DataFileReader<GenericRecord>.OpenReader(ms, avschema);
+            //    }
+
+            //    while (fileReader?.HasNext() == true)
+            //    {
+            //        var avroRecord = fileReader.Next();
+
+            //        foreach (var column in output.Schema)
+            //        {
+            //            if (avroRecord[column.Name] != null)
+            //            {
+            //                output.Set(column.Name, avroRecord[column.Name]);
+            //            }
+            //            else
+            //            {
+            //                output.Set<object>(column.Name, null);
+            //            }
+            //        }
+
+            //        yield return output.AsReadOnly();
+            //    }
+            //}
         }
+        
     }
 }
