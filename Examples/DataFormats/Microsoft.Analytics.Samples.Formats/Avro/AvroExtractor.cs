@@ -14,11 +14,12 @@
 // limitations under the License.
 //
 
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Analytics.Interfaces;
 using Avro.File;
 using Avro.Generic;
-using System.IO;
 
 namespace Microsoft.Analytics.Samples.Formats.ApacheAvro
 {
@@ -27,11 +28,19 @@ namespace Microsoft.Analytics.Samples.Formats.ApacheAvro
     {
         private readonly string _avroSchema;
         private readonly bool _mapToInternalSchema;
+        private readonly bool _ignoreColumnMismatches;
 
-        public AvroExtractor(string avroSchema, bool mapToInternalSchema = false)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="avroSchema">Avro schema. Used when mapToInternalSchema is false, or when there is no internal avro schema in the file.</param>
+        /// <param name="mapToInternalSchema">Set to true to use the schema in the avro file instead of the avroSchema parameter</param>
+        /// <param name="ignoreColumnMismatches">Set to true to ignore column type and name mismatches.</param>
+        public AvroExtractor(string avroSchema, bool mapToInternalSchema = false, bool ignoreColumnMismatches = false)
         {
             _avroSchema = avroSchema;
             _mapToInternalSchema = mapToInternalSchema;
+            _ignoreColumnMismatches = ignoreColumnMismatches;
         }
 
         public override IEnumerable<IRow> Extract(IUnstructuredReader input, IUpdatableRow output)
@@ -68,61 +77,38 @@ namespace Microsoft.Analytics.Samples.Formats.ApacheAvro
 
                     foreach (var column in output.Schema)
                     {
-                        if (avroRecord[column.Name] != null)
+                        if (avroRecord.TryGetValue(column.Name, out var obj))
                         {
-                            output.Set(column.Name, avroRecord[column.Name]);
+                            if (column.Type.IsInstanceOfType(obj))
+                            {
+                                output.Set(column.Name, obj);
+                            }
+                            else
+                            {
+                                if (obj == null || _ignoreColumnMismatches)
+                                    output.Set(column.Name, column.DefaultValue);
+                                else 
+                                    throw new Exception($"Column type mismatch. Output column {column.Name} of type {column.Type} is not an instance of avro file type {obj.GetType()}");
+                            }
                         }
                         else
                         {
-                            output.Set<object>(column.Name, null);
+                            if (_ignoreColumnMismatches)
+                            {
+                                output.Set(column.Name, column.DefaultValue);
+                            }
+                            else
+                            {
+                                var fieldsString = string.Join(", ", avroRecord.Schema.Fields.Select(field => field.Name));
+                                throw new Exception($"Column mismatch. Output schema column {column.Name} does not exist in avro schema fields: [{fieldsString}]");
+                            }
                         }
+
                     }
 
                     yield return output.AsReadOnly();
                 }
             }
-           
-            //using (var ms = new MemoryStream())
-            //{
-            //    CreateSeekableStream(input, ms);
-            //    ms.Position = 0;
-
-            //    var foundSchema = false;
-
-            //    if (mapToInternalSchema)
-            //    {
-            //        fileReader = DataFileReader<GenericRecord>.OpenReader(ms);
-            //        var schema = fileReader.GetSchema();
-
-            //        foundSchema = schema != null;
-            //    }
-
-            //    if (!foundSchema)
-            //    {
-            //        ms.Position = 0;
-            //        fileReader = DataFileReader<GenericRecord>.OpenReader(ms, avschema);
-            //    }
-
-            //    while (fileReader?.HasNext() == true)
-            //    {
-            //        var avroRecord = fileReader.Next();
-
-            //        foreach (var column in output.Schema)
-            //        {
-            //            if (avroRecord[column.Name] != null)
-            //            {
-            //                output.Set(column.Name, avroRecord[column.Name]);
-            //            }
-            //            else
-            //            {
-            //                output.Set<object>(column.Name, null);
-            //            }
-            //        }
-
-            //        yield return output.AsReadOnly();
-            //    }
-            //}
         }
-        
     }
 }

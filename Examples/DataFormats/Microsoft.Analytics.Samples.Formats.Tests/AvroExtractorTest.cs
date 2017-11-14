@@ -345,6 +345,61 @@ namespace Microsoft.Analytics.Samples.Formats.Tests
             Assert.IsTrue(result.Count == 0);
         }
 
+        [TestMethod]
+        public void AvroExtractor_ColumnMismatch_Throw()
+        {
+            var schema = @"{""type"":""record"",""name"":""SingleColumnPoco"",""namespace"":""Microsoft.Analytics.Samples.Formats.Tests"",""fields"":[{""name"":""Value"",""type"":[""null"",""string""]}]}";
+            var data = new List<SingleColumnPoco<string>>
+            {
+                new SingleColumnPoco<string>() { Value = "asdf" },
+                new SingleColumnPoco<string>() { Value = null }
+            };
+
+            var output = SingleColumnRowGenerator<int>().AsUpdatable();
+
+            using (var dataStream = new MemoryStream())
+            {
+                serializeAvro(dataStream, data, schema);
+
+                var reader = new USqlStreamReader(dataStream);
+                var extractor = new AvroExtractor(schema);
+                try
+                {
+                    extractor.Extract(reader, output).ToList();
+                    Assert.Fail();
+                }
+                catch
+                {
+                    //
+                }
+            }
+        }
+
+        [TestMethod]
+        public void AvroExtractor_IgnoreColumnMismatch_Ignore()
+        {
+            var schema = @"{""type"":""record"",""name"":""SingleColumnPoco"",""namespace"":""Microsoft.Analytics.Samples.Formats.Tests"",""fields"":[{""name"":""Value"",""type"":[""null"",""string""]}]}";
+            var data = new List<SingleColumnPoco<string>>
+            {
+                new SingleColumnPoco<string>() { Value = "asdf" },
+                new SingleColumnPoco<string>() { Value = null }
+            };
+
+            var output = SingleColumnRowGenerator<int>().AsUpdatable();
+
+            using (var dataStream = new MemoryStream())
+            {
+                serializeAvro(dataStream, data, schema);
+
+                var reader = new USqlStreamReader(dataStream);
+                var extractor = new AvroExtractor(schema, ignoreColumnMismatches: true);
+
+                var result = extractor.Extract(reader, output).ToList();
+                Assert.AreEqual(0, result[0].Get<int>("Value"));
+                Assert.AreEqual(0,result[1].Get<int>("Value"));
+            }
+        }
+
         private IList<IRow> ExecuteExtract<T>(List<SingleColumnPoco<T>> data, string schema, bool autoSchemaExtract = false)
         {
             var output = SingleColumnRowGenerator<T>().AsUpdatable();
@@ -359,7 +414,7 @@ namespace Microsoft.Analytics.Samples.Formats.Tests
             }
         }
 
-        private IList<IRow> ExecuteExtract<T,T2>(List<SingleColumnPoco<T>> data, string schema, bool autoSchemaExtract = false)
+        private IList<IRow> ExecuteExtract<T, T2>(List<SingleColumnPoco<T>> data, string schema, bool autoSchemaExtract = false)
         {
             var output = DualColumnRowGenerator<T, T2>().AsUpdatable();
 
