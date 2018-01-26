@@ -1,14 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Avro;
 using Avro.File;
 using Avro.Generic;
 using Microsoft.Analytics.Interfaces;
+using Microsoft.Analytics.Types.Sql;
 
 namespace Microsoft.Analytics.Samples.Formats.ApacheAvro
 {
@@ -32,14 +28,23 @@ namespace Microsoft.Analytics.Samples.Formats.ApacheAvro
                 var writer = new GenericDatumWriter<GenericRecord>(_avSchema);
                 _fileWriter = DataFileWriter<GenericRecord>.OpenWriter(writer, output.BaseStream);
             }
-            
+
             var record = new GenericRecord(_avSchema);
-            
+
             foreach (var x in input.Schema)
             {
-                record.Add(x.Name, input.Get<object>(x.Name));
+                var obj = input.Get<object>(x.Name);
+
+                if (obj != null)
+                {
+                    var objType = obj.GetType();
+                    if (objType.IsGenericType && objType.GetGenericTypeDefinition() == typeof(SqlArray<>))
+                        obj = ((System.Collections.IEnumerable) obj).Cast<object>().ToArray();
+                }
+
+                record.Add(x.Name, obj);
             }
-            
+
             _fileWriter.Append(record);
         }
 
