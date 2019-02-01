@@ -19,7 +19,7 @@ namespace Microsoft.Analytics.Samples.Formats.ApacheAvro
         private readonly byte[] _tmpBuffer;
         private int _tmpBufferLength;
 
-        private int _tmpBufferStartPosition;
+        private long _tmpBufferStartPosition;
         private readonly int _length;
 
         /// <inheritdoc />
